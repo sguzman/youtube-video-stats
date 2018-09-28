@@ -7,6 +7,8 @@ import json
 import os
 from multiprocessing.dummy import Pool
 import random
+import sys
+import traceback
 
 
 seen = queue.Queue()
@@ -126,18 +128,22 @@ def get_channel_info(channel_id):
 
 
 def vids(i):
-    pg = soup_page(i)
-    channels = []
-    select = pg.select('a.aj.row')
-    for a_href in select:
-        path = a_href['href'].split('/')
-        channel_id = path[2]
+    try:
+        pg = soup_page(i)
+        channels = []
+        select = pg.select('a.aj.row')
+        for a_href in select:
+            path = a_href['href'].split('/')
+            channel_id = path[2]
 
-        if channel_id not in table_chans:
-            info = get_channel_info(channel_id)
-            channels.append(info)
+            if channel_id not in table_chans:
+                info = get_channel_info(channel_id)
+                channels.append(info)
 
-    seen.put((i, channels))
+        seen.put((i, channels))
+    except Exception as e:
+        print(e, file=sys.stderr)
+        traceback.print_exc()
 
 
 def main():
