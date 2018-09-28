@@ -103,7 +103,7 @@ def get_channel_info(channel_id):
     data = [channel_id,
             nest_index(snippet, ['title']),
             nest_index(snippet, ['customUrl']),
-            desc,
+            desc.replace('\0', ' '),
             nest_index(snippet, ['publishedAt']),
             nest_index(snippet, ['thumbnails', 'url']),
             nest_index(items, ['topicDetails', 'topicIds']),
