@@ -96,6 +96,12 @@ def get_channel_info(channel_id):
     text = requests.get(url, params=params).text
     json_body = json.loads(text)
 
+    if 'items' not in json_body:
+        return None
+
+    if len(json_body['items']) == 0:
+        return None
+
     items = json_body['items'][0]
     snippet = items['snippet']
     desc = nest_index(snippet, ['description'])
@@ -138,7 +144,8 @@ def vids(i):
 
             if channel_id not in table_chans:
                 info = get_channel_info(channel_id)
-                channels.append(info)
+                if info is not None:
+                    channels.append(info)
 
         seen.put((i, channels))
     except Exception as e:
