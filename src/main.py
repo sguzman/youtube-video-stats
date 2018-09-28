@@ -6,6 +6,7 @@ import psycopg2
 import json
 import os
 from multiprocessing.dummy import Pool
+import random
 
 
 seen = queue.Queue()
@@ -99,11 +100,13 @@ def get_channel_info(channel_id):
     if desc is not None:
         if len(desc) == 0:
             desc = None
+    else:
+        desc = desc.replace('\0', ' ')
 
     data = [channel_id,
             nest_index(snippet, ['title']),
             nest_index(snippet, ['customUrl']),
-            desc.replace('\0', ' '),
+            desc,
             nest_index(snippet, ['publishedAt']),
             nest_index(snippet, ['thumbnails', 'url']),
             nest_index(items, ['topicDetails', 'topicIds']),
@@ -138,7 +141,11 @@ def vids(i):
 
 def main():
     threading.Thread(target=seen_daemon, daemon=True).start()
-    pool.map(vids, range(limit))
+
+    nums = list(range(limit))
+    random.shuffle(nums)
+
+    pool.map(vids, nums)
     print('done')
 
 
