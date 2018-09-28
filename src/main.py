@@ -40,8 +40,8 @@ def insert_vids(cursor, data):
     sql_insert_chann = f'INSERT INTO youtube.channels.{table} ' \
                        '(chan_serial, title, custom_url, description, joined, thumbnail, topic_ids, ' \
                        'topic_categories, privacy_status, is_linked, long_uploads, tracking_id, ' \
-                       'moderate_comments, show_related_channels, show_browse, banner_image) ' \
-                       'VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)'
+                       'moderate_comments, show_related_channels, show_browse, banner_image, subs) ' \
+                       'VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)'
 
     for datum in data:
         print(datum[0])
@@ -86,7 +86,7 @@ def get_channel_info(channel_id):
     url = f'https://www.googleapis.com/youtube/v3/channels'
 
     params = {
-        'part': 'snippet,contentDetails,brandingSettings,contentOwnerDetails,invideoPromotion,localizations,status,topicDetails',
+        'part': 'snippet,contentDetails,brandingSettings,contentOwnerDetails,invideoPromotion,localizations,status,topicDetails,statistics',
         'id': channel_id,
         'key': os.environ['API_KEY']
     }
@@ -119,6 +119,7 @@ def get_channel_info(channel_id):
             nest_index(items, ['brandingSettings', 'channel', 'showRelatedChannels']),
             nest_index(items, ['brandingSettings', 'channel', 'showBrowseView']),
             nest_index(items, ['brandingSettings', 'image', 'bannerImageUrl']),
+            items['statistics']['subscriberCount'],
             ]
 
     return data
