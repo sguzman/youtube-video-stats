@@ -7,9 +7,9 @@ import os
 
 db_user = 'postgres'
 db_pass = ''
-db_host = 'postgres-service.youtube.svc.cluster.local'
+db_host = '192.168.1.63'
 db_db = 'youtube'
-db_port = '5432'
+db_port = '30000'
 
 keys = os.environ['API_KEY'].split('|')
 
@@ -24,17 +24,14 @@ def get_key():
 
 
 def insert_vids(conn, data):
-    sql_insert_chann = 'INSERT INTO youtube.entities.chans ' \
-                       '(id, serial, title, custom_url, description, joined, thumbnail, topic_ids, ' \
-                       'topic_categories, privacy_status, is_linked, long_uploads, tracking_id, ' \
-                       'moderate_comments, show_related_channels, show_browse, banner_image, subs,' \
-                       'video_count, video_views) ' \
-                       'VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) ' \
+    sql_insert_vids = 'INSERT INTO youtube.entities.videos ' \
+                       '(id, serial, title,) ' \
+                       'VALUES () ' \
                        'ON CONFLICT DO NOTHING'
 
     cursor = conn.cursor()
     print(data)
-    cursor.execute(sql_insert_chann, data)
+    cursor.execute(sql_insert_vids, data)
     conn.commit()
     cursor.close()
 
@@ -50,60 +47,67 @@ def nest_index(obj, indexes):
     return tmp
 
 
-def get_data(i, ids_by_chans):
+def get_data(i, ids_by_vids):
     snippet = i['snippet']
-    data = [ids_by_chans[i['id']],
+    data = [ids_by_vids[i['id']],
             i['id'],
-            nest_index(snippet, ['title']),
-            nest_index(snippet, ['customUrl']),
-            nest_index(snippet, ['description']),
             nest_index(snippet, ['publishedAt']),
-            nest_index(snippet, ['thumbnails', 'url']),
-            nest_index(i, ['topicDetails', 'topicIds']),
-            nest_index(i, ['topicDetails', 'topicCategories']),
+            nest_index(snippet, ['channelId']),
+            nest_index(snippet, ['title']),
+            nest_index(snippet, ['description']),
+            nest_index(snippet, ['thumbnails', 'default', 'url']),
+            int(nest_index(snippet, ['categoryId'])),
+            nest_index(snippet, ['liveBroadcastContent']),
+            nest_index(snippet, ['defaultAudioLanguage']),
+            nest_index(i, ['contentDetails', 'duration']),
+            nest_index(i, ['contentDetails', 'dimension']),
+            nest_index(i, ['contentDetails', 'definition']),
+            'true' == nest_index(i, ['contentDetails', 'caption']),
+            nest_index(i, ['contentDetails', 'licensedContent']),
+            nest_index(i, ['contentDetails', 'projection']),
+            nest_index(i, ['status', 'uploadStatus']),
             nest_index(i, ['status', 'privacyStatus']),
-            nest_index(i, ['status', 'isLinked']),
-            nest_index(i, ['status', 'longUploadsStatus']),
-            nest_index(i, ['brandingSettings', 'channel', 'trackingAnalyticsAccountId']),
-            nest_index(i, ['brandingSettings', 'channel', 'moderateComments']),
-            nest_index(i, ['brandingSettings', 'channel', 'showRelatedChannels']),
-            nest_index(i, ['brandingSettings', 'channel', 'showBrowseView']),
-            nest_index(i, ['brandingSettings', 'image', 'bannerImageUrl']),
-            i['statistics']['subscriberCount'],
-            i['statistics']['videoCount'],
-            i['statistics']['viewCount']
+            nest_index(i, ['status', 'license']),
+            nest_index(i, ['status', 'embeddable']),
+            nest_index(i, ['status', 'publicStatsViewable']),
+            nest_index(i, ['topicDetails', 'relevantTopicIds∂']),
+            nest_index(i, ['topicDetails', 'topicCategories']),
+            int(nest_index(i, ['statistics', 'viewCount'])),
+            int(nest_index(i, ['statistics', 'likeCount'])),
+            int(nest_index(i, ['statistics', 'dislikeCount'])),
+            int(nest_index(i, ['statistics', 'favoriteCount'])),
+            int(nest_index(i, ['statistics', 'commentCount']))
             ]
 
     return data
 
 
-def get_channel_info(channels):
-    url = f'https://www.googleapis.com/youtube/v3/channels'
-    chans = [a[1] for a in channels]
-    ids_by_chans = {a[1]: a[0] for a in channels}
+def get_video_info(videos):
+    url = 'https://www.googleapis.com/youtube/v3/videos'
+    vids = [a[1] for a in videos]
+    ids_by_vids = {a[1]: a[0] for a in videos}
 
     params = {
-        'part': 'snippet,contentDetails,brandingSettings,contentOwnerDetails,invideoPromotion,localizations,status,topicDetails,statistics',
-        'id': ','.join(chans),
+        'part': 'snippet,contentDetails,liveStreamingDetails,recordingDetails,status,topicDetails,statistics',
+        'id': ','.join(vids),
         'key': get_key()
     }
 
     text = requests.get(url, params=params).text
     json_body = json.loads(text)
-
     items = json_body['items']
 
     datas = []
     for i in items:
-        data = get_data(i, ids_by_chans)
+        data = get_data(i, ids_by_vids)
         datas.append(data)
 
     return datas
 
 
-def get_channels():
+def get_videos():
     conn = connection()
-    sql = 'SELECT id, serial FROM youtube.entities.channels ORDER BY RANDOM() LIMIT 50'
+    sql = 'SELECT id, serial FROM youtube.entities.videos ORDER BY RANDOM() LIMIT 50'
     cursor = conn.cursor()
     cursor.execute(sql)
     records = cursor.fetchall()
@@ -115,12 +119,13 @@ def get_channels():
 
 def main():
     while True:
-        sample = get_channels()
-        chans = get_channel_info(sample)
-        for c in chans:
-            conn = connection()
-            insert_vids(conn, c)
-            conn.close()
+        sample = get_videos()
+        vids = get_video_info(sample)
+        for v in vids:
+            print(v)
+            #conn = connection()
+            #insert_vids(conn, c)
+            #conn.close()
 
 
 if __name__ == '__main__':
