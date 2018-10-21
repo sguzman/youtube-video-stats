@@ -88,6 +88,12 @@ def live_broad(string):
     return string
 
 
+def none_to_num(raw_str):
+    if raw_str is None:
+        return 0
+    return int(raw_str)
+
+
 def get_data(i):
     snippet = i['snippet']
     data = [i['id'],
@@ -112,11 +118,11 @@ def get_data(i):
             nest_index(i, ['status', 'publicStatsViewable']),
             nest_index(i, ['topicDetails', 'relevantTopicIds∂']),
             nest_index(i, ['topicDetails', 'topicCategories']),
-            int(nest_index(i, ['statistics', 'viewCount'])),
-            int(nest_index(i, ['statistics', 'likeCount'])),
-            int(nest_index(i, ['statistics', 'dislikeCount'])),
-            int(nest_index(i, ['statistics', 'favoriteCount'])),
-            int(nest_index(i, ['statistics', 'commentCount']))
+            none_to_num(nest_index(i, ['statistics', 'viewCount'])),
+            none_to_num(nest_index(i, ['statistics', 'likeCount'])),
+            none_to_num(nest_index(i, ['statistics', 'dislikeCount'])),
+            none_to_num(nest_index(i, ['statistics', 'favoriteCount'])),
+            none_to_num(nest_index(i, ['statistics', 'commentCount']))
             ]
 
     return data
@@ -161,7 +167,6 @@ def main():
         sample = get_videos()
         vids = get_video_info(sample)
         for v in vids:
-            print(v)
             conn = connection()
             insert_vids(conn, v)
             conn.close()
