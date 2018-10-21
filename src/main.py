@@ -5,11 +5,11 @@ import json
 import os
 
 
-db_user = 'root'
+db_user = 'postgres'
 db_pass = ''
-db_host = 'localhost'
+db_host = '192.168.1.63'
 db_db = 'youtube'
-db_port = '5432'
+db_port = '30000'
 
 keys = os.environ['API_KEY'].split('|')
 
@@ -23,22 +23,20 @@ def get_key():
     return random.choice(keys)
 
 
-def insert_vids(data):
-    conn = connection()
-
-    sql_insert_chann = f'INSERT INTO youtube.channels.chans ' \
-                       '(chan_serial, title, custom_url, description, joined, thumbnail, topic_ids, ' \
+def insert_vids(conn, data):
+    sql_insert_chann = 'INSERT INTO youtube.entities.chans ' \
+                       '(id, serial, title, custom_url, description, joined, thumbnail, topic_ids, ' \
                        'topic_categories, privacy_status, is_linked, long_uploads, tracking_id, ' \
-                       'moderate_comments, show_related_channels, show_browse, banner_image, subs) ' \
-                       'VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)'
+                       'moderate_comments, show_related_channels, show_browse, banner_image, subs,' \
+                       'video_count, video_views) ' \
+                       'VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) ' \
+                       'ON CONFLICT DO NOTHING'
 
     cursor = conn.cursor()
-    for datum in data:
-        print(datum[0])
-        cursor.execute(sql_insert_chann, datum)
+    print(data)
+    cursor.execute(sql_insert_chann, data)
     conn.commit()
     cursor.close()
-    conn.close()
 
 
 def nest_index(obj, indexes):
@@ -50,6 +48,33 @@ def nest_index(obj, indexes):
             return None
 
     return tmp
+
+
+def get_data(i, ids_by_chans):
+    snippet = i['snippet']
+    data = [ids_by_chans[i['id']],
+            i['id'],
+            nest_index(snippet, ['title']),
+            nest_index(snippet, ['customUrl']),
+            nest_index(snippet, ['description']),
+            nest_index(snippet, ['publishedAt']),
+            nest_index(snippet, ['thumbnails', 'url']),
+            nest_index(i, ['topicDetails', 'topicIds']),
+            nest_index(i, ['topicDetails', 'topicCategories']),
+            nest_index(i, ['status', 'privacyStatus']),
+            nest_index(i, ['status', 'isLinked']),
+            nest_index(i, ['status', 'longUploadsStatus']),
+            nest_index(i, ['brandingSettings', 'channel', 'trackingAnalyticsAccountId']),
+            nest_index(i, ['brandingSettings', 'channel', 'moderateComments']),
+            nest_index(i, ['brandingSettings', 'channel', 'showRelatedChannels']),
+            nest_index(i, ['brandingSettings', 'channel', 'showBrowseView']),
+            nest_index(i, ['brandingSettings', 'image', 'bannerImageUrl']),
+            i['statistics']['subscriberCount'],
+            i['statistics']['videoCount'],
+            i['statistics']['viewCount']
+            ]
+
+    return data
 
 
 def get_channel_info(channels):
@@ -70,29 +95,7 @@ def get_channel_info(channels):
 
     datas = []
     for i in items:
-        snippet = i['snippet']
-        data = [ids_by_chans[i['id']],
-                             i['id'],
-                nest_index(snippet, ['title']),
-                nest_index(snippet, ['customUrl']),
-                nest_index(snippet, ['description']),
-                nest_index(snippet, ['publishedAt']),
-                nest_index(snippet, ['thumbnails', 'url']),
-                nest_index(items, ['topicDetails', 'topicIds']),
-                nest_index(items, ['topicDetails', 'topicCategories']),
-                nest_index(items, ['status', 'privacyStatus']),
-                nest_index(items, ['status', 'isLinked']),
-                nest_index(items, ['status', 'longUploadsStatus']),
-                nest_index(items, ['brandingSettings', 'channel', 'trackingAnalyticsAccountId']),
-                nest_index(items, ['brandingSettings', 'channel', 'moderateComments']),
-                nest_index(items, ['brandingSettings', 'channel', 'showRelatedChannels']),
-                nest_index(items, ['brandingSettings', 'channel', 'showBrowseView']),
-                nest_index(items, ['brandingSettings', 'image', 'bannerImageUrl']),
-                i['statistics']['subscriberCount'],
-                i['statistics']['videoCount'],
-                i['statistics']['viewCount']
-                ]
-
+        data = get_data(i, ids_by_chans)
         datas.append(data)
 
     return datas
@@ -113,7 +116,11 @@ def get_channels():
 def main():
     while True:
         sample = get_channels()
-        get_channel_info(sample)
+        chans = get_channel_info(sample)
+        for c in chans:
+            conn = connection()
+            insert_vids(conn, c)
+            conn.close()
 
 
 if __name__ == '__main__':
