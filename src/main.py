@@ -10,7 +10,7 @@ db_user = 'root'
 db_pass = ''
 db_host = 'localhost'
 db_db = 'youtube'
-db_port = '30000'
+db_port = '5432'
 
 keys = os.environ['API_KEY'].split('|')
 
@@ -25,13 +25,13 @@ def get_key():
 
 
 def insert_vids(conn, data):
-    sql_insert_vids = 'INSERT INTO youtube.entities.videos ' \
-                       '(id, serial, published_at, channel_id, title, description, thumbnail, category_id, ' \
+    sql_insert_vids = 'INSERT INTO youtube.entities.vids ' \
+                       '(serial, published_at, channel_id, title, description, thumbnail, category_id, ' \
                       'live_broadcasting_content, default_audio_language, duration, dimension, definition, caption, ' \
                       'licensed_content, projection, upload_status, privacy_status, license, embeddable, ' \
                       'public_stats_viewable, relevant_topic_ids, topic_categories, view_count, like_count, ' \
                       'dislike_count, favorite_count, comment_count) ' \
-                       'VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, ' \
+                       'VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, ' \
                       '%s, %s, %s, %s, %s, %s, %s) ' \
                        'ON CONFLICT DO NOTHING'
 
@@ -82,17 +82,22 @@ def interval(string):
     return datetime.timedelta(days=days, hours=hours, minutes=minutes, seconds=seconds)
 
 
-def get_data(i, ids_by_vids):
+def live_broad(string):
+    if string == 'none':
+        return None
+    return string
+
+
+def get_data(i):
     snippet = i['snippet']
-    data = [ids_by_vids[i['id']],
-            i['id'],
+    data = [i['id'],
             nest_index(snippet, ['publishedAt']),
             nest_index(snippet, ['channelId']),
             nest_index(snippet, ['title']),
             nest_index(snippet, ['description']),
             nest_index(snippet, ['thumbnails', 'default', 'url']),
             int(nest_index(snippet, ['categoryId'])),
-            nest_index(snippet, ['liveBroadcastContent']),
+            live_broad(nest_index(snippet, ['liveBroadcastContent'])),
             nest_index(snippet, ['defaultAudioLanguage']),
             interval(nest_index(i, ['contentDetails', 'duration'])),
             nest_index(i, ['contentDetails', 'dimension']),
@@ -120,7 +125,6 @@ def get_data(i, ids_by_vids):
 def get_video_info(videos):
     url = 'https://www.googleapis.com/youtube/v3/videos'
     vids = [a[1] for a in videos]
-    ids_by_vids = {a[1]: a[0] for a in videos}
 
     params = {
         'part': 'snippet,contentDetails,liveStreamingDetails,recordingDetails,status,topicDetails,statistics',
@@ -134,7 +138,7 @@ def get_video_info(videos):
 
     datas = []
     for i in items:
-        data = get_data(i, ids_by_vids)
+        data = get_data(i)
         datas.append(data)
 
     return datas
