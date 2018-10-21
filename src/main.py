@@ -1,76 +1,44 @@
-import bs4
 import requests
-import queue
-import threading
+import random
 import psycopg2
 import json
 import os
-from multiprocessing.dummy import Pool
-import random
-import sys
-import traceback
 
 
-seen = queue.Queue()
-cores = 8
-pool = Pool(cores)
-limit = 15865
-table = 'chans'
+db_user = 'root'
+db_pass = ''
+db_host = 'localhost'
+db_db = 'youtube'
+db_port = '5432'
+
+keys = os.environ['API_KEY'].split('|')
 
 
-def get_incumbent_chans():
-    postgresql_select_query = f'SELECT chan_serial FROM youtube.channels.{table}'
-    cursor = conn.cursor()
-    cursor.execute(postgresql_select_query)
-    records = cursor.fetchall()
-
-    ignore = set()
-    for i in records:
-        ignore.add(i[0])
-
-    print(len(ignore), 'channels from table')
-
-    cursor.close()
-    return ignore
+def connection():
+    conn = psycopg2.connect(user=db_user, password=db_pass, host=db_host, port=db_port, database=db_db)
+    return conn
 
 
-conn = psycopg2.connect(user='root', password='', host='127.0.0.1', port='5432', database='youtube')
-table_chans = get_incumbent_chans()
+def get_key():
+    return random.choice(keys)
 
 
-def insert_vids(cursor, data):
-    sql_insert_chann = f'INSERT INTO youtube.channels.{table} ' \
+def insert_vids(data):
+    conn = connection()
+
+    sql_insert_chann = f'INSERT INTO youtube.channels.chans ' \
                        '(chan_serial, title, custom_url, description, joined, thumbnail, topic_ids, ' \
                        'topic_categories, privacy_status, is_linked, long_uploads, tracking_id, ' \
                        'moderate_comments, show_related_channels, show_browse, banner_image, subs) ' \
                        'VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)'
 
+    cursor = conn.cursor()
     for datum in data:
         print(datum[0])
         cursor.execute(sql_insert_chann, datum)
-
-
-def seen_daemon():
-    while True:
-        idx, channels = seen.get(block=True)
-        cursor = conn.cursor()
-        insert_vids(cursor, channels)
-        conn.commit()
-        cursor.close()
-
-
-def page(idx):
-    url = f'https://dbase.tube/chart/channels/subscribers/all?page={idx}&spf=navigate'
-    return requests.get(url)
-
-
-def soup_page(idx):
-    req = page(idx)
-    text = req.text
-    json_data = json.loads(text)
-    body = json_data['body']['spf_content']
-
-    return bs4.BeautifulSoup(body, 'html.parser')
+    conn.commit()
+    cursor.close()
+    conn.close()
 
 
 def nest_index(obj, indexes):
@@ -84,83 +52,69 @@ def nest_index(obj, indexes):
     return tmp
 
 
-def get_channel_info(channel_id):
+def get_channel_info(channels):
     url = f'https://www.googleapis.com/youtube/v3/channels'
+    chans = [a[1] for a in channels]
+    ids_by_chans = {a[1]: a[0] for a in channels}
 
     params = {
         'part': 'snippet,contentDetails,brandingSettings,contentOwnerDetails,invideoPromotion,localizations,status,topicDetails,statistics',
-        'id': channel_id,
-        'key': os.environ['API_KEY']
+        'id': ','.join(chans),
+        'key': get_key()
     }
 
     text = requests.get(url, params=params).text
     json_body = json.loads(text)
 
-    if 'items' not in json_body:
-        return None
+    items = json_body['items']
 
-    if len(json_body['items']) == 0:
-        return None
+    datas = []
+    for i in items:
+        snippet = i['snippet']
+        data = [ids_by_chans[i['id']],
+                             i['id'],
+                nest_index(snippet, ['title']),
+                nest_index(snippet, ['customUrl']),
+                nest_index(snippet, ['description']),
+                nest_index(snippet, ['publishedAt']),
+                nest_index(snippet, ['thumbnails', 'url']),
+                nest_index(items, ['topicDetails', 'topicIds']),
+                nest_index(items, ['topicDetails', 'topicCategories']),
+                nest_index(items, ['status', 'privacyStatus']),
+                nest_index(items, ['status', 'isLinked']),
+                nest_index(items, ['status', 'longUploadsStatus']),
+                nest_index(items, ['brandingSettings', 'channel', 'trackingAnalyticsAccountId']),
+                nest_index(items, ['brandingSettings', 'channel', 'moderateComments']),
+                nest_index(items, ['brandingSettings', 'channel', 'showRelatedChannels']),
+                nest_index(items, ['brandingSettings', 'channel', 'showBrowseView']),
+                nest_index(items, ['brandingSettings', 'image', 'bannerImageUrl']),
+                i['statistics']['subscriberCount'],
+                i['statistics']['videoCount'],
+                i['statistics']['viewCount']
+                ]
 
-    items = json_body['items'][0]
-    snippet = items['snippet']
-    desc = nest_index(snippet, ['description'])
-    if desc is not None:
-        if len(desc) == 0:
-            desc = None
-    else:
-        desc = desc.replace('\0', ' ')
+        datas.append(data)
 
-    data = [channel_id,
-            nest_index(snippet, ['title']),
-            nest_index(snippet, ['customUrl']),
-            desc,
-            nest_index(snippet, ['publishedAt']),
-            nest_index(snippet, ['thumbnails', 'url']),
-            nest_index(items, ['topicDetails', 'topicIds']),
-            nest_index(items, ['topicDetails', 'topicCategories']),
-            nest_index(items, ['status', 'privacyStatus']),
-            nest_index(items, ['status', 'isLinked']),
-            nest_index(items, ['status', 'longUploadsStatus']),
-            nest_index(items, ['brandingSettings', 'channel', 'trackingAnalyticsAccountId']),
-            nest_index(items, ['brandingSettings', 'channel', 'moderateComments']),
-            nest_index(items, ['brandingSettings', 'channel', 'showRelatedChannels']),
-            nest_index(items, ['brandingSettings', 'channel', 'showBrowseView']),
-            nest_index(items, ['brandingSettings', 'image', 'bannerImageUrl']),
-            items['statistics']['subscriberCount'],
-            ]
-
-    return data
+    return datas
 
 
-def vids(i):
-    try:
-        pg = soup_page(i)
-        channels = []
-        select = pg.select('a.aj.row')
-        for a_href in select:
-            path = a_href['href'].split('/')
-            channel_id = path[2]
+def get_channels():
+    conn = connection()
+    sql = 'SELECT id, serial FROM youtube.entities.channels ORDER BY RANDOM() LIMIT 50'
+    cursor = conn.cursor()
+    cursor.execute(sql)
+    records = cursor.fetchall()
 
-            if channel_id not in table_chans:
-                info = get_channel_info(channel_id)
-                if info is not None:
-                    channels.append(info)
-
-        seen.put((i, channels))
-    except Exception as e:
-        print(e, file=sys.stderr)
-        traceback.print_exc()
+    cursor.close()
+    conn.close()
+    return records
 
 
 def main():
-    threading.Thread(target=seen_daemon, daemon=True).start()
-
-    nums = list(range(limit))
-    random.shuffle(nums)
-
-    pool.map(vids, nums)
-    print('done')
+    while True:
+        sample = get_channels()
+        get_channel_info(sample)
 
 
-main()
+if __name__ == '__main__':
+    main()
