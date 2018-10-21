@@ -8,9 +8,9 @@ import datetime
 
 db_user = 'postgres'
 db_pass = ''
-db_host = '192.168.1.63'
+db_host = 'postgres-service.youtube.svc.cluster.local'
 db_db = 'youtube'
-db_port = '30000'
+db_port = '5432'
 
 keys = os.environ['API_KEY'].split('|')
 
