@@ -3,11 +3,12 @@ import random
 import psycopg2
 import json
 import os
+import datetime
 
 
-db_user = 'postgres'
+db_user = 'root'
 db_pass = ''
-db_host = '192.168.1.63'
+db_host = 'localhost'
 db_db = 'youtube'
 db_port = '30000'
 
@@ -25,8 +26,13 @@ def get_key():
 
 def insert_vids(conn, data):
     sql_insert_vids = 'INSERT INTO youtube.entities.videos ' \
-                       '(id, serial, title,) ' \
-                       'VALUES () ' \
+                       '(id, serial, published_at, channel_id, title, description, thumbnail, category_id, ' \
+                      'live_broadcasting_content, default_audio_language, duration, dimension, definition, caption, ' \
+                      'licensed_content, projection, upload_status, privacy_status, license, embeddable, ' \
+                      'public_stats_viewable, relevant_topic_ids, topic_categories, view_count, like_count, ' \
+                      'dislike_count, favorite_count, comment_count) ' \
+                       'VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, ' \
+                      '%s, %s, %s, %s, %s, %s, %s) ' \
                        'ON CONFLICT DO NOTHING'
 
     cursor = conn.cursor()
@@ -47,6 +53,35 @@ def nest_index(obj, indexes):
     return tmp
 
 
+def interval(string):
+    raw_str = string[2:]
+    days = 0
+    hours = 0
+    minutes = 0
+    seconds = 0
+
+    days_idx = raw_str.find('D')
+    if days_idx != -1:
+        days = int(raw_str[:days_idx])
+        raw_str = raw_str[days_idx + 1:]
+
+    hours_idx = raw_str.find('H')
+    if hours_idx != -1:
+        hours = int(raw_str[:hours_idx])
+        raw_str = raw_str[hours_idx + 1:]
+
+    mins_idx = raw_str.find('M')
+    if mins_idx != -1:
+        minutes = int(raw_str[:mins_idx])
+        raw_str = raw_str[mins_idx + 1:]
+
+    secs_idx = raw_str.find('S')
+    if secs_idx != -1:
+        seconds = int(raw_str[:secs_idx])
+
+    return datetime.timedelta(days=days, hours=hours, minutes=minutes, seconds=seconds)
+
+
 def get_data(i, ids_by_vids):
     snippet = i['snippet']
     data = [ids_by_vids[i['id']],
@@ -59,7 +94,7 @@ def get_data(i, ids_by_vids):
             int(nest_index(snippet, ['categoryId'])),
             nest_index(snippet, ['liveBroadcastContent']),
             nest_index(snippet, ['defaultAudioLanguage']),
-            nest_index(i, ['contentDetails', 'duration']),
+            interval(nest_index(i, ['contentDetails', 'duration'])),
             nest_index(i, ['contentDetails', 'dimension']),
             nest_index(i, ['contentDetails', 'definition']),
             'true' == nest_index(i, ['contentDetails', 'caption']),
@@ -123,9 +158,9 @@ def main():
         vids = get_video_info(sample)
         for v in vids:
             print(v)
-            #conn = connection()
-            #insert_vids(conn, c)
-            #conn.close()
+            conn = connection()
+            insert_vids(conn, v)
+            conn.close()
 
 
 if __name__ == '__main__':
