@@ -128,9 +128,8 @@ def get_data(i):
     return data
 
 
-def get_video_info(videos):
+def get_video_info(vids):
     url = 'https://www.googleapis.com/youtube/v3/videos'
-    vids = [a[1] for a in videos]
 
     params = {
         'part': 'snippet,contentDetails,liveStreamingDetails,recordingDetails,status,topicDetails,statistics',
@@ -152,10 +151,10 @@ def get_video_info(videos):
 
 def get_videos():
     conn = connection()
-    sql = 'SELECT id, serial FROM youtube.entities.videos ORDER BY RANDOM() LIMIT 50'
+    sql = 'SELECT serial FROM youtube.entities.videos ORDER BY RANDOM() LIMIT 50'
     cursor = conn.cursor()
     cursor.execute(sql)
-    records = cursor.fetchall()
+    records = [x[0] for x in cursor.fetchall()]
 
     cursor.close()
     conn.close()
