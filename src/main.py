@@ -29,10 +29,9 @@ def insert_vids(conn, data):
                        '(serial, published_at, channel_id, title, description, thumbnail, category_id, ' \
                       'live_broadcasting_content, default_audio_language, duration, dimension, definition, caption, ' \
                       'licensed_content, projection, upload_status, privacy_status, license, embeddable, ' \
-                      'public_stats_viewable, relevant_topic_ids, topic_categories, view_count, like_count, ' \
-                      'dislike_count, favorite_count, comment_count) ' \
+                      'public_stats_viewable, relevant_topic_ids, topic_categories) ' \
                        'VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, ' \
-                      '%s, %s, %s, %s, %s, %s, %s) ' \
+                      '%s, %s) ' \
                        'ON CONFLICT DO NOTHING'
 
     cursor = conn.cursor()
@@ -118,11 +117,6 @@ def get_data(i):
             nest_index(i, ['status', 'publicStatsViewable']),
             nest_index(i, ['topicDetails', 'relevantTopicIds∂']),
             nest_index(i, ['topicDetails', 'topicCategories']),
-            none_to_num(nest_index(i, ['statistics', 'viewCount'])),
-            none_to_num(nest_index(i, ['statistics', 'likeCount'])),
-            none_to_num(nest_index(i, ['statistics', 'dislikeCount'])),
-            none_to_num(nest_index(i, ['statistics', 'favoriteCount'])),
-            none_to_num(nest_index(i, ['statistics', 'commentCount']))
             ]
 
     return data
@@ -132,7 +126,7 @@ def get_video_info(vids):
     url = 'https://www.googleapis.com/youtube/v3/videos'
 
     params = {
-        'part': 'snippet,contentDetails,liveStreamingDetails,recordingDetails,status,topicDetails,statistics',
+        'part': 'snippet,contentDetails,liveStreamingDetails,recordingDetails,status,topicDetails',
         'id': ','.join(vids),
         'key': get_key()
     }
